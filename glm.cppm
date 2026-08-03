@@ -4,8 +4,10 @@ module;
 
 export module GLM;
 
-
+export using::glm::vec4;
 export using::glm::vec3;
+export using::glm::vec2;
+
 export using::glm::lookAt;
 export using::glm::normalize;
 export using::glm::cross;
