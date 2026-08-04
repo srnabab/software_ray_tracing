@@ -327,16 +327,16 @@ int main() {
 	//vec3 lightColor = vec3(1.0f, 1.0f, 1.0f);
 
 	std::vector<Light> lights;
-	lights.push_back(Light{ .intensity = 1.0f, .light = vec3(-0.05f, 0.2f, 0.0f), .lightColor = vec3(1.0f, 1.0f, 1.0f) });
-	lights.push_back(Light{ .intensity = 1.0f, .light = vec3(0.0f, 0.2f, 0.0f), .lightColor = vec3(1.0f, 1.0f, 1.0f) });
-	lights.push_back(Light{ .intensity = 1.0f, .light = vec3(-0.5f, 0.2f, 0.0f), .lightColor = vec3(1.0f, 1.0f, 1.0f) });
-	lights.push_back(Light{ .intensity = 2.0f, .light = vec3(0.1f, -0.2f, -0.1f), .lightColor = vec3(1.0f, 0.0f, 1.0f) });
+	lights.push_back(Light{ .intensity = 10.0f, .light = vec3(-0.05f, 0.2f, 0.0f), .lightColor = vec3(1.0f, 1.0f, 1.0f) });
+	lights.push_back(Light{ .intensity = 10.0f, .light = vec3(0.0f, 0.2f, 0.0f), .lightColor = vec3(1.0f, 1.0f, 0.0f) });
+	lights.push_back(Light{ .intensity = 10.0f, .light = vec3(-0.5f, 0.2f, 0.0f), .lightColor = vec3(0.0f, 1.0f, 1.0f) });
+	lights.push_back(Light{ .intensity = 10.0f, .light = vec3(0.1f, -0.2f, -0.1f), .lightColor = vec3(1.0f, 0.0f, 1.0f) });
 
 	//for (auto l : lights) {
 	//	addLight(triangles, l);
 	//}
 
-	int reflect = 2;
+	int reflect = 8;
 
 	vec3 O = vec3(0.0, 0.0, 1.0);
 	vec3 cameraUp = vec3(0.0, 1.0, 0.0);
@@ -416,14 +416,17 @@ int main() {
 
 				vec3 V = GLM::normalize(p - O);
 				//std::cout << D.x << "," << D.y << "," << D.z << "\n'";
-				vec3 totalLight = {};
+				vec3 P = O;
 
-				auto [minT, _u, _v, hit, index] = BVH_ClosestHit(BVH, triangles, O, V);
+				std::vector<vec4> color(reflect + 1);
+				for (int r = 0; r < reflect + 1; r++)
+				{
+					color[r] = vec4(0.0f);
+					vec3 totalLight = {};
+					auto [minT, _u, _v, hit, index] = BVH_ClosestHit(BVH, triangles, P, V);
 
-				//std::cout << "b\n";
-
-				if (hit) {
-					auto P_new = calculateNewP(O, V, minT, triangles, _u, _v, index);
+					if (!hit) break;
+					auto P_new = calculateNewP(P, V, minT, triangles, _u, _v, index);
 
 					vec3 normal = GLM::normalize(triangles[index].v0.normal * (1.0f - _u - _v) +
 						triangles[index].v1.normal * _u +
@@ -455,79 +458,6 @@ int main() {
 						//	faceNormal = GLM::normalize(cross(E1, E2));
 						//}
 
-						vec3 P_2 = P_new;
-						//float flip = dot(D, normal) ? -1.0f : 1.0f;
-						vec3 V_2 = V - 2 * dot(V, normal) * normal;
-						std::vector<vec4> color(reflect);
-						for (int r = 0; r < reflect; r++)
-						{
-							auto [minT_2, _u_2, _v_2, hit_2, index_2] = BVH_ClosestHit(BVH, triangles, P_2, V_2);
-							//std::cout << "c\n";
-
-							if (!hit_2) break;
-
-							auto P_2_new = calculateNewP(P_2, V_2, minT_2, triangles, _u_2, _v_2, index_2);
-
-							float T_2 = GLM::distance(light, P_2_new);
-
-							vec3 normal_2 = GLM::normalize(triangles[index_2].v0.normal * (1.0f - _u_2 - _v_2) +
-								triangles[index_2].v1.normal * _u_2 +
-								triangles[index_2].v2.normal * _v_2);
-
-							if (dot(V_2, normal_2) > 0.0f) {
-								normal_2 = -normal_2;
-							}
-
-							vec3 D_2 = GLM::normalize(light - P_2_new);
-
-							//vec3 faceNormal_2 = vec3(0.0);
-							//{
-							//	vec3 V0 = triangles[index_2].v0.pos;
-							//	vec3 V1 = triangles[index_2].v1.pos;
-							//	vec3 V2 = triangles[index_2].v2.pos;
-
-							//	vec3 E1 = V1 - V0;
-							//	vec3 E2 = V2 - V0;
-
-							//	faceNormal_2 = GLM::normalize(cross(E1, E2));
-							//}
-
-							bool shadow_2 = BVH_AnyHit(BVH, triangles, index_2, P_2_new, D_2, T_2);
-
-							float Light = 0.0f;
-							float ambient = 0.2f;
-
-							float l1 = std::max(0.0f, 1 - pow(T_2 / 100.0f, 4.0f));
-							Light += intensity / (T_2 * T_2 + EPSILON) * l1 * l1;
-
-							float diffuse = std::max(0.0f, dot(normal_2, D_2));
-
-							Light *= diffuse;
-
-							Light += ambient;
-
-							if (shadow_2) {
-								Light *= shadowFactor;
-							}
-
-							vec3 fc = triangles[index_2].v0.color * Light;
-
-							color[r].x = fc.x;
-							color[r].y = fc.y;
-							color[r].z = fc.z;
-
-							color[r].w = 0.9f;
-
-							P_2 = P_2_new;
-							V_2 = V_2 - 2 * dot(V_2, normal_2) * normal_2;
-						}
-
-						for (int ci = static_cast<int>(color.size() - 2); ci >= 0; ci -= 1) {
-							color[ci].x += color[ci + 1].x * color[ci].w;
-							color[ci].y += color[ci + 1].y * color[ci].w;
-							color[ci].z += color[ci + 1].z * color[ci].w;
-						}
-
 						bool shadow = BVH_AnyHit(BVH, triangles, index, P_new, D, T);
 						//bool shadow = false;
 
@@ -539,28 +469,27 @@ int main() {
 
 						float diffuse = std::max(0.0f, dot(normal, D));
 
-						vec3 L = GLM::normalize(light - P_new); // 光源方向
-						vec3 V_s = GLM::normalize(O - P_new); // 视线方向
-						vec3 H = GLM::normalize(L + V_s); // 半角向量
+						Light *= diffuse;
 
 						vec3 specular_color = {};
 
-						if (!shadow) {
-							// Ns 是插值得到的平滑着色法线
-							float specular_intensity = pow(std::max(dot(normal, H), 0.0f), 64.0f); // 64 为高光指数，数值越大点越小越亮
-							specular_color = lightColor * specular_intensity * 0.9f;
+						if (r == 0) {
+							vec3 L = GLM::normalize(light - P_new); // 光源方向
+							vec3 V_s = GLM::normalize(P - P_new); // 视线方向
+							vec3 H = GLM::normalize(L + V_s); // 半角向量
+
+							if (!shadow) {
+								// Ns 是插值得到的平滑着色法线
+								float specular_intensity = pow(std::max(dot(normal, H), 0.0f), 64.0f); // 64 为高光指数，数值越大点越小越亮
+								specular_color = lightColor * specular_intensity * 0.9f;
+							}
 						}
 
-						Light *= diffuse;
-
-						Light += ambient;
-
-						vec3 reflectColor = {};
-						if (color.size() > 0) {
-							reflectColor = vec3(color[0]);
+						if (abs(Light) < EPSILON) {
+							Light += ambient;
 						}
 
-						vec3 finalColor = triangles[index].v0.color * Light * 0.1f + 0.9f * reflectColor + specular_color;
+						vec3 finalColor = triangles[index].v0.color * Light + specular_color;
 
 						if (shadow) {
 							finalColor *= shadowFactor;
@@ -569,21 +498,42 @@ int main() {
 						totalLight += finalColor;
 					}
 
-					totalLight = totalLight / (totalLight + 1.0f);
+					color[r].x = totalLight.x;
+					color[r].y = totalLight.y;
+					color[r].z = totalLight.z;
+					color[r].w = 0.9f;
 
-					totalLight.x = pow(totalLight.x, 1.0f / 2.2f);
-					totalLight.y = pow(totalLight.y, 1.0f / 2.2f);
-					totalLight.z = pow(totalLight.z, 1.0f / 2.2f);
-
-					totalLight *= 255.0f;
-
-					u32 color_u32 = (static_cast<uint32_t>(255) << 24) | (static_cast<uint32_t>(totalLight.r) << 16) |
-						(static_cast<uint32_t>(totalLight.g) << 8) | (static_cast<uint32_t>(totalLight.b) << 0);
-
-					buffer[i * width + j] = color_u32;
+					P = P_new;
+					V = V - 2 * dot(V, normal) * normal;
 				}
+
+				vec3 totalLight = vec3{};
+				for (int r = reflect - 1; r >= 0; r--) {
+					color[r].x *= (1.0f - color[r].w);
+					color[r].y *= (1.0f - color[r].w);
+					color[r].z *= (1.0f - color[r].w);
+
+					color[r].x += color[r + 1].x * color[r].w;
+					color[r].y += color[r + 1].y * color[r].w;
+					color[r].z += color[r + 1].z * color[r].w;
+				}
+				totalLight = color[0];
+
+				totalLight = totalLight / (totalLight + 1.0f);
+
+				totalLight.x = pow(totalLight.x, 1.0f / 2.2f);
+				totalLight.y = pow(totalLight.y, 1.0f / 2.2f);
+				totalLight.z = pow(totalLight.z, 1.0f / 2.2f);
+
+				totalLight *= 255.0f;
+
+				u32 color_u32 = (static_cast<uint32_t>(255) << 24) | (static_cast<uint32_t>(totalLight.r) << 16) |
+					(static_cast<uint32_t>(totalLight.g) << 8) | (static_cast<uint32_t>(totalLight.b) << 0);
+
+				buffer[i * width + j] = color_u32;
 			}
 		}
+
 
 		//auto duration = std::chrono::system_clock::now() - start;
 
